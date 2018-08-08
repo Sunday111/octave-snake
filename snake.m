@@ -14,17 +14,28 @@ colormap = [1, 1, 1;
             0, 0.5, 0;
             0.5, 0, 0];
 
-head_x = start_body_size + 2;
-head_y = 2;
+% generate snake
+snake_body = 2* ones(start_body_size, 2);
+snake_body(:, 2) = [1:start_body_size] + 2;
+snake_head = [2, 2 + start_body_size];
 
-tail_x = 2;
-tail_y = 2;
-
+% apply fillers to the stage
 stage = ones(height, width) * symbol_none;
+
+% apply borders to the stage
 stage(:, [1, width]) = ones(height, 2) * symbol_wall;
 stage([1, height], :) = ones(2, width) * symbol_wall;
-stage(2, [2:start_body_size + 1]) = ones(1, start_body_size) * symbol_body;
-stage(head_y, head_x) = symbol_head;
+
+% apply snake body to the stage
+for i = [1:length(snake_parts) - 1]
+    part = snake_body(i, :);
+    stage(part(1), part(2)) = symbol_body;
+endfor
+
+% apply snake head to the stage
+stage(snake_head(1), snake_head(2)) = symbol_head;
+
+bad_choices = [symbol_wall, symbol_body];
 
 [fx, fy] = make_food_coords(stage, symbol_none);
 stage(fy, fx) = symbol_food;
@@ -32,42 +43,47 @@ stage(fy, fx) = symbol_food;
 clf
 draw_stage(stage, colormap);
 
+score = 0;
+inputs = [1, 0; 0, -1; -1, 0; 0, 1;
+          1, 1; -1, -1; 1, -1; -1, 1];
+
 % main loop
 while(true)
-    w = 1; a = 2; s = 3; d = 4;
-    choice = input("Turn (w, a, s, d): ");
-
-    dx = 0;
-    dy = 0;
-
-    if(choice == w)
-        dy = 1;
-    elseif(choice == a)
-        dx = -1;
-    elseif(choice == s)
-        dy = -1;
-    elseif(choice == d)
-        dx = 1;
-    endif
+    %w = 1; a = 2; s = 3; d = 4;
+    %choice = input("Turn (w, a, s, d): ");
+    choice = snake_ai(inputs, snake_head, stage, bad_choices, [fy, fx]);
+    delta = inputs(choice, :);
 
     % move snake
-    ny = head_y + dy;
-    nx = head_x + dx;
-    if (ny > height || ny < 1 || nx > width || nx < 1 || (stage(ny, nx) == symbol_body) || (stage(ny, nx) == symbol_wall))
+    if (choice_finishes_game(delta, snake_head, stage, bad_choices))
+        score
         break;
     endif
 
-    got_food = stage(ny, nx) == symbol_food;
+    new_head = snake_head + delta;
 
-    stage(ny, nx) = symbol_head;
-    stage(head_y, head_x) = symbol_body;
-
-    if (!got_food)
+    % food found ?
+    if (stage(new_head(1), new_head(2)) == symbol_food)
+        % generate new food object
+        [fx, fy] = make_food_coords(stage, symbol_none);
+        stage(fy, fx) = symbol_food;
+        score = score + 1;
+    else
+        % remove tail
+        tail = snake_body(1, :);
+        stage(tail(1), tail(2)) = symbol_none;
+        snake_body = snake_body(2:end, :);
     endif
 
-    head_x = nx;
-    head_y = ny;
+    % add body part instead of head
+    snake_body = [snake_body; snake_head];
+    stage(new_head(1), new_head(2)) = symbol_head;
+    stage(snake_head(1), snake_head(2)) = symbol_body;
+
+    % assign new head
+    snake_head = new_head;
 
     clf
     draw_stage(stage, colormap);
+    pause (0.5);
 endwhile
